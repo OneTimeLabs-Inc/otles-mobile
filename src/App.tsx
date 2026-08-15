@@ -42,6 +42,22 @@ const LAST_DOCUMENT_KEY =
   "otles-mobile-last-document";
 
 
+function getRequestedDocumentId(): string | null {
+
+  const match =
+    window.location.pathname.match(
+      /^\/document\/([^/]+)\/?$/,
+    );
+
+  return match
+    ? decodeURIComponent(
+        match[1],
+      )
+    : null;
+
+}
+
+
 export default function App() {
 
   const {
@@ -95,6 +111,7 @@ export default function App() {
 
   async function openDocument(
     documentId: string,
+    updateUrl = true,
   ) {
 
     setLoading(true);
@@ -113,6 +130,16 @@ export default function App() {
         LAST_DOCUMENT_KEY,
         documentId,
       );
+
+      if (updateUrl) {
+
+        window.history.pushState(
+          {},
+          "",
+          `/document/${documentId}`,
+        );
+
+      }
 
       setDrawerOpen(false);
 
@@ -188,32 +215,55 @@ export default function App() {
         setTree(explorerTree);
 
 
-        const lastDocumentId =
+        const requestedDocumentId =
+          getRequestedDocumentId();
+
+
+        const documentIdToOpen =
+          requestedDocumentId ??
           localStorage.getItem(
             LAST_DOCUMENT_KEY,
           );
 
 
-        if (lastDocumentId) {
+        if (documentIdToOpen) {
 
           try {
 
-            const lastDocument =
+            const initialDocument =
               await getDocument(
-                lastDocumentId,
+                documentIdToOpen,
               );
 
 
             setSelectedDocument(
-              lastDocument,
+              initialDocument,
+            );
+
+
+            localStorage.setItem(
+              LAST_DOCUMENT_KEY,
+              documentIdToOpen,
             );
 
           }
           catch {
 
-            localStorage.removeItem(
-              LAST_DOCUMENT_KEY,
-            );
+            if (!requestedDocumentId) {
+
+              localStorage.removeItem(
+                LAST_DOCUMENT_KEY,
+              );
+
+            }
+
+            if (requestedDocumentId) {
+
+              setError(
+                "This document could not be opened. It may not exist or you may not have access to it.",
+              );
+
+            }
 
           }
 
