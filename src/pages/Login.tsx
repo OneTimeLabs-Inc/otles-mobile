@@ -20,7 +20,14 @@ import {
    ========================================================== */
 
 
-export default function Login() {
+type Props = {
+  message?: string | null;
+};
+
+
+export default function Login({
+  message = null,
+}: Props) {
 
   const [
     email,
@@ -190,7 +197,8 @@ export default function Login() {
           </h2>
 
           <p>
-            Access your organization's technical documentation.
+            {message ??
+              "Access your organization's technical documentation."}
           </p>
 
         </div>

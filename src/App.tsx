@@ -21,6 +21,8 @@ import {
 import {
   getDocument,
   getExplorerTree,
+  getSharedDocument,
+  type SharedDocumentAccess,
 } from "./services/document";
 
 import type {
@@ -66,48 +68,38 @@ export default function App() {
   } =
     useAuthContext();
 
-
-  const [
-    workspace,
-    setWorkspace,
-  ] =
+  const [workspace, setWorkspace] =
     useState<CurrentWorkspace | null>(null);
 
-
-  const [
-    tree,
-    setTree,
-  ] =
+  const [tree, setTree] =
     useState<ExplorerCategory[]>([]);
 
-
-  const [
-    selectedDocument,
-    setSelectedDocument,
-  ] =
+  const [selectedDocument, setSelectedDocument] =
     useState<Document | null>(null);
 
+  const [sharedAccess, setSharedAccess] =
+    useState<SharedDocumentAccess | null>(null);
 
-  const [
-    drawerOpen,
-    setDrawerOpen,
-  ] =
+  const [sharedChecked, setSharedChecked] =
     useState(false);
 
-
-  const [
-    loading,
-    setLoading,
-  ] =
+  const [drawerOpen, setDrawerOpen] =
     useState(false);
 
+  const [loading, setLoading] =
+    useState(false);
 
-  const [
-    error,
-    setError,
-  ] =
+  const [error, setError] =
     useState("");
 
+  const requestedDocumentId =
+    getRequestedDocumentId();
+
+
+  /* ========================================================
+     APP 001
+     Open authenticated mobile document
+     ======================================================== */
 
   async function openDocument(
     documentId: string,
@@ -117,12 +109,9 @@ export default function App() {
     setLoading(true);
     setError("");
 
-
     try {
-
       const document =
         await getDocument(documentId);
-
 
       setSelectedDocument(document);
 
@@ -132,13 +121,11 @@ export default function App() {
       );
 
       if (updateUrl) {
-
         window.history.pushState(
           {},
           "",
           `/document/${documentId}`,
         );
-
       }
 
       setDrawerOpen(false);
@@ -148,52 +135,112 @@ export default function App() {
         behavior: "instant",
       });
 
-    }
-    catch (loadError) {
-
+    } catch (loadError) {
       setError(
         loadError instanceof Error
           ? loadError.message
           : "Unable to load the document.",
       );
-
-    }
-    finally {
-
+    } finally {
       setLoading(false);
-
     }
 
   }
 
 
+  /* ========================================================
+     APP 002
+     Anonymous direct-link check
+     ======================================================== */
+
+  useEffect(() => {
+
+    let active = true;
+
+    if (
+      isLoading ||
+      user ||
+      !requestedDocumentId
+    ) {
+      setSharedAccess(null);
+      setSharedChecked(
+        !requestedDocumentId ||
+        Boolean(user),
+      );
+      return () => {
+        active = false;
+      };
+    }
+
+    async function loadSharedDocument() {
+
+      try {
+        setSharedChecked(false);
+        setError("");
+
+        const result =
+          await getSharedDocument(
+            requestedDocumentId as string,
+          );
+
+        if (active) {
+          setSharedAccess(result);
+        }
+
+      } catch (loadError) {
+
+        if (active) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load the shared OTLES document.",
+          );
+        }
+
+      } finally {
+        if (active) {
+          setSharedChecked(true);
+        }
+      }
+    }
+
+    void loadSharedDocument();
+
+    return () => {
+      active = false;
+    };
+
+  }, [
+    isLoading,
+    requestedDocumentId,
+    user,
+  ]);
+
+
+  /* ========================================================
+     APP 003
+     Authenticated workspace initialization
+     ======================================================== */
+
   useEffect(() => {
 
     if (!user) {
-
       setWorkspace(null);
       setTree([]);
       setSelectedDocument(null);
-
       return;
-
     }
-
 
     async function initialize() {
 
       setLoading(true);
       setError("");
 
-
       try {
-
         const currentWorkspace =
           await getCurrentWorkspace();
 
-
         setWorkspace(currentWorkspace);
-
 
         const workspaceId =
           currentWorkspace
@@ -202,22 +249,19 @@ export default function App() {
             ?.[0]
             ?.id;
 
-
         if (!workspaceId) {
+          setError(
+            "Your account does not have an active OTLES organization membership.",
+          );
           return;
         }
 
-
         const explorerTree =
-          await getExplorerTree(workspaceId);
-
+          await getExplorerTree(
+            workspaceId,
+          );
 
         setTree(explorerTree);
-
-
-        const requestedDocumentId =
-          getRequestedDocumentId();
-
 
         const documentIdToOpen =
           requestedDocumentId ??
@@ -225,105 +269,165 @@ export default function App() {
             LAST_DOCUMENT_KEY,
           );
 
-
         if (documentIdToOpen) {
-
           try {
-
             const initialDocument =
               await getDocument(
                 documentIdToOpen,
               );
 
-
             setSelectedDocument(
               initialDocument,
             );
-
 
             localStorage.setItem(
               LAST_DOCUMENT_KEY,
               documentIdToOpen,
             );
 
-          }
-          catch {
+          } catch {
 
             if (!requestedDocumentId) {
-
               localStorage.removeItem(
                 LAST_DOCUMENT_KEY,
               );
-
             }
 
             if (requestedDocumentId) {
-
               setError(
-                "This document could not be opened. It may not exist or you may not have access to it.",
+                "This document could not be opened. It may not exist or your account may not have access to it.",
               );
-
             }
-
           }
-
         }
 
-      }
-      catch (loadError) {
-
+      } catch (loadError) {
         setError(
           loadError instanceof Error
             ? loadError.message
             : "Unable to load OTLES.",
         );
-
-      }
-      finally {
-
+      } finally {
         setLoading(false);
-
       }
-
     }
-
 
     void initialize();
 
-  }, [user]);
+  }, [
+    requestedDocumentId,
+    user,
+  ]);
 
+
+  /* ========================================================
+     APP 004
+     Global authentication loading
+     ======================================================== */
 
   if (isLoading) {
-
     return (
-
       <main className="mobile-loading">
-
         <div className="mobile-loading-mark">
           O
         </div>
-
         <p>Loading OTLES...</p>
-
       </main>
-
     );
-
   }
 
 
+  /* ========================================================
+     APP 005
+     Anonymous direct-link behavior
+     ======================================================== */
+
   if (!user) {
+
+    if (requestedDocumentId) {
+
+      if (!sharedChecked) {
+        return (
+          <main className="mobile-loading">
+            <div className="mobile-loading-mark">
+              O
+            </div>
+            <p>Loading shared document...</p>
+          </main>
+        );
+      }
+
+      if (error) {
+        return (
+          <main className="mobile-shell">
+            <section className="mobile-reader">
+              <div className="mobile-workspace-error">
+                <strong>OTLES error</strong>
+                <p>{error}</p>
+              </div>
+            </section>
+          </main>
+        );
+      }
+
+      if (
+        sharedAccess?.access === "granted" &&
+        sharedAccess.document
+      ) {
+        return (
+          <main className="mobile-shell">
+            <DocumentReader
+              document={
+                sharedAccess.document
+              }
+            />
+          </main>
+        );
+      }
+
+      if (
+        sharedAccess?.access === "login_required" ||
+        sharedAccess?.access === "membership_required"
+      ) {
+        return (
+          <Login
+            message={
+              sharedAccess.access === "login_required"
+                ? "This document requires an active organization login. Sign in to continue."
+                : "This document requires an active membership in the owning organization. Sign in with the correct account to continue."
+            }
+          />
+        );
+      }
+
+      return (
+        <main className="mobile-shell">
+          <section className="mobile-reader">
+            <div className="mobile-workspace-error">
+              <strong>Document unavailable</strong>
+              <p>
+                This document is not available through a public OTLES Mobile link.
+              </p>
+            </div>
+          </section>
+        </main>
+      );
+    }
+
     return <Login />;
   }
 
+
+  /* ========================================================
+     APP 006
+     Authenticated mobile application
+     ======================================================== */
 
   const organizationName =
     workspace?.organization?.name ??
     "OTLES";
 
-
   return (
-
     <main className="mobile-shell">
 
       <MobileHeader
@@ -355,57 +459,39 @@ export default function App() {
         }}
       />
 
-      {
-        loading && (
-
-          <div className="mobile-library-state">
-
-            <div className="mobile-loading-mark">
-              O
-            </div>
-
-            <p>Loading documentation...</p>
-
+      {loading && (
+        <div className="mobile-library-state">
+          <div className="mobile-loading-mark">
+            O
           </div>
+          <p>Loading documentation...</p>
+        </div>
+      )}
 
-        )
-      }
-
-      {
-        !loading &&
+      {!loading &&
         error && (
-
           <section className="mobile-reader">
-
             <div className="mobile-workspace-error">
               <strong>OTLES error</strong>
               <p>{error}</p>
             </div>
-
           </section>
+        )}
 
-        )
-      }
-
-      {
-        !loading &&
+      {!loading &&
         !error &&
         selectedDocument && (
-
           <DocumentReader
-            document={selectedDocument}
+            document={
+              selectedDocument
+            }
           />
+        )}
 
-        )
-      }
-
-      {
-        !loading &&
+      {!loading &&
         !error &&
         !selectedDocument && (
-
           <section className="mobile-home">
-
             <div className="mobile-home-mark">
               O
             </div>
@@ -428,14 +514,9 @@ export default function App() {
             >
               Browse documentation
             </button>
-
           </section>
-
-        )
-      }
+        )}
 
     </main>
-
   );
-
 }

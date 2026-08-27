@@ -29,6 +29,7 @@ type DocumentDatabaseRecord = {
   author: string | null;
   updated_at: string;
   is_published: boolean;
+  login_required: boolean;
   sort_order: number;
 };
 
@@ -295,7 +296,8 @@ export async function getDocument(
   current_revision_id,
   author,
   updated_at,
-  is_published
+  is_published,
+  login_required
 `)
     .eq(
       "id",
@@ -469,9 +471,169 @@ slug:
 isPublished:
   documentRecord.is_published,
 
+loginRequired:
+  documentRecord.login_required,
+
   };
 
 }
+
+/* ==========================================================
+   SHARED MOBILE DOCUMENT
+   Load a direct document link before authentication when the
+   document has explicitly been marked No Login Required.
+   ========================================================== */
+
+export type SharedDocumentAccess = {
+  access:
+    | "granted"
+    | "login_required"
+    | "membership_required";
+  loginRequired: boolean;
+  organizationName: string | null;
+  document: Document | null;
+};
+
+
+type SharedDocumentRpc = {
+  access?:
+    | "granted"
+    | "login_required"
+    | "membership_required";
+  login_required?: boolean;
+  organization_name?: string;
+  document?: {
+    id?: string;
+    category_id?: string | null;
+    number?: number;
+    title?: string;
+    slug?: string;
+    description?: string | null;
+    status?: string;
+    author?: string | null;
+    updated_at?: string;
+    is_published?: boolean;
+    category_code?: string | null;
+    revision_id?: string;
+    revision?: number;
+    version?: string;
+    content?: string;
+  } | null;
+};
+
+
+export async function getSharedDocument(
+  documentId: string,
+): Promise<SharedDocumentAccess | null> {
+
+  const {
+    data,
+    error,
+  } = await supabase.rpc(
+    "get_mobile_otles_document_v1",
+    {
+      document_id:
+        documentId,
+    },
+  );
+
+  if (error) {
+    throw new Error(
+      `Unable to load shared OTLES document: ${error.message}`,
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const response =
+    data as SharedDocumentRpc;
+
+  if (
+    response.access === "login_required" ||
+    response.access === "membership_required"
+  ) {
+    return {
+      access: response.access,
+      loginRequired: true,
+      organizationName:
+        response.organization_name ?? null,
+      document: null,
+    };
+  }
+
+  if (
+    response.access !== "granted" ||
+    !response.document
+  ) {
+    return null;
+  }
+
+  const record =
+    response.document;
+
+  if (
+    !record.id ||
+    !record.title ||
+    !record.slug ||
+    !record.revision_id ||
+    !record.version ||
+    record.number === undefined ||
+    record.revision === undefined
+  ) {
+    return null;
+  }
+
+  const categoryCode =
+    record.category_code ?? "";
+
+  const code =
+    categoryCode
+      ? `${categoryCode}-${String(record.number).padStart(3, "0")}`
+      : String(record.number).padStart(3, "0");
+
+  return {
+    access: "granted",
+    loginRequired:
+      response.login_required !== false,
+    organizationName:
+      response.organization_name ?? null,
+    document: {
+      id: record.id,
+      categoryId:
+        record.category_id ?? null,
+      number:
+        Number(record.number),
+      code,
+      title:
+        record.title,
+      status:
+        record.status ?? "Published",
+      description:
+        record.description ?? "",
+      content:
+        record.content ?? "",
+      version:
+        record.version,
+      updated:
+        record.updated_at ?? "",
+      author:
+        record.author ?? "Unknown",
+      revisionId:
+        record.revision_id,
+      revisionNumber:
+        Number(record.revision),
+      slug:
+        record.slug,
+      isPublished:
+        record.is_published === true,
+      loginRequired:
+        response.login_required !== false,
+    },
+  };
+}
+
 
 /* ==========================================================
    DOCUMENT CREATION

@@ -15,4 +15,5 @@ export type Document = {
 
   slug: string;
   isPublished: boolean;
+  loginRequired: boolean;
 };

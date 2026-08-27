@@ -54,7 +54,9 @@ Promise<User | null> {
    ========================================================== */
 
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(
+  redirectPath = window.location.pathname || "/",
+) {
 
   return supabase.auth.signInWithOAuth({
 
@@ -63,7 +65,7 @@ export async function signInWithGoogle() {
     options: {
 
       redirectTo:
-        `${window.location.origin}/`,
+        `${window.location.origin}${redirectPath}`,
 
     },
 
