@@ -2,6 +2,7 @@ export type Document = {
   id: string;
   categoryId: string | null;
   number: number;
+  code: string;
   title: string;
   status: string;
   description: string;

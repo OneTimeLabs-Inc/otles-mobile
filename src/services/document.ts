@@ -162,6 +162,7 @@ const {
       {
         id: category.id,
         name: category.name,
+        code: category.code,
         expanded: true,
         documents: [],
         children: [],
@@ -194,9 +195,7 @@ const explorerDocument: ExplorerDocument = {
   id: document.id,
 
   code:
-    `${category.name
-      .substring(0, 3)
-      .toUpperCase()}-${document.number
+    `${category.code}-${document.number
       .toString()
       .padStart(3, "0")}`,
 
@@ -361,6 +360,48 @@ export async function getDocument(
     revisionData as RevisionDatabaseRecord;
 
 
+  let categoryCode = "";
+
+  if (documentRecord.category_id) {
+
+    const {
+      data: categoryData,
+      error: categoryError,
+    } = await supabase
+      .from("otles_categories")
+      .select("code")
+      .eq(
+        "id",
+        documentRecord.category_id,
+      )
+      .single();
+
+
+    if (categoryError) {
+      throw new Error(
+        `Unable to load the OTLES document category: ${categoryError.message}`,
+      );
+    }
+
+
+    categoryCode =
+      typeof categoryData?.code === "string"
+        ? categoryData.code
+        : "";
+
+  }
+
+
+  const documentCode =
+    categoryCode
+      ? `${categoryCode}-${documentRecord.number
+          .toString()
+          .padStart(3, "0")}`
+      : documentRecord.number
+          .toString()
+          .padStart(3, "0");
+
+
 
   return {
 
@@ -374,6 +415,10 @@ export async function getDocument(
 
     number:
       documentRecord.number,
+
+
+    code:
+      documentCode,
 
 
     title:

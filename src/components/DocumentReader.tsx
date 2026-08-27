@@ -23,7 +23,7 @@ export default function DocumentReader({
       <header className="mobile-reader-header">
 
         <p>
-          {document.number}
+          {document.code}
         </p>
 
         <h1>

@@ -8,6 +8,7 @@ export type ExplorerDocument = {
 export type ExplorerCategory = {
   id: string;
   name: string;
+  code: string;
   expanded: boolean;
   documents: ExplorerDocument[];
   children: ExplorerCategory[];
