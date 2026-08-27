@@ -22,7 +22,7 @@ type DocumentDatabaseRecord = {
   category_id: string | null;
   number: number;
   title: string;
-  slug: string;
+  slug: string | null;
   description: string | null;
   status: string;
   current_revision_id: string | null;
@@ -465,7 +465,7 @@ revisionNumber:
 
 
 slug:
-  documentRecord.slug,
+  documentRecord.slug ?? documentRecord.id,
 
 
 isPublished:
@@ -576,7 +576,6 @@ export async function getSharedDocument(
   if (
     !record.id ||
     !record.title ||
-    !record.slug ||
     !record.revision_id ||
     !record.version ||
     record.number === undefined ||
@@ -625,7 +624,7 @@ export async function getSharedDocument(
       revisionNumber:
         Number(record.revision),
       slug:
-        record.slug,
+        record.slug ?? record.id,
       isPublished:
         record.is_published === true,
       loginRequired:
